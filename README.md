@@ -136,6 +136,7 @@ Subtasks:
 - [x] Load all three internal datasets, validate schema against the brief
 - [x] Handle missing/malformed rows
 - [x] Aggregate per-client, per-pillar "activity currently captured by Syn Bank"
+- [x] Add client spot-check and dataset coverage verification script
 - [ ] Teammate's data dictionary reviewed and merged into `docs/`
 
 **🔲 Checkpoint 2 — Data ingestion**
@@ -455,3 +456,5 @@ Sunday, 16 August 2026, 23:59.
 - **2026-08-08** - Built Task 002 ingestion/profiling: raw CSVs convert to local
   Parquet caches, profiling flags 20 unique clients plus duplicate IDs for review,
   and `outputs/client_activity_ranking.csv` is generated for Phase 3 tiering.
+- **2026-08-08** - Added a client spot-check and coverage verification script for
+  validating ranking totals and investigating per-dataset client absence.
