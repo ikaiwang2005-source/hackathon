@@ -1,0 +1,17 @@
+# Environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# Confidential data - never commit real data files
+data/*
+!data/.gitkeep
+
+# OS/editor cruft
+.DS_Store
+.vscode/
+.ipynb_checkpoints/
