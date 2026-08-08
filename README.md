@@ -1,15 +1,5 @@
 # Syn Bank Share of Wallet Intelligence Engine
 
-<!-- Codex: at the end of every task markdown file executed in this project, update
-README.md as follows: (1) tick the completed subtask checkboxes under the relevant
-phase's detailed section, (2) flip that phase's Status in the "Build Phases" summary
-table to the correct state (⬜ Not started / 🟨 In progress / ✅ Done), (3) once the
-phase's checkpoint testing has been confirmed passing by the user, change that
-phase's checkpoint marker from 🔲 to ✅ and prefix it "passed", (4) append a new
-one-line dated entry to the "## Progress Log" section at the bottom summarising what
-was done. Do not skip any of these four — they can drift out of sync with each other
-if only some are updated. -->
-
 **Standard Bank x Stellenbosch University Data Science Hackathon — 2026**
 
 An intelligence engine that estimates how much of a corporate client's total banking
@@ -57,8 +47,8 @@ meeting, rather than a spreadsheet of numbers.
 
 | Name | Background |
 |---|---|
-| I-kai | Mechatronic Engineering |
-| Kiran | Electrical Engineering |
+| [Your Name] | Mechatronic Engineering |
+| [Teammate Name] | Electrical Engineering |
 
 Neither of us came into this with a finance background. The approach below was
 deliberately chosen to lean on transparent, defensible logic rather than deep domain
@@ -107,6 +97,7 @@ Quick-reference summary — see the detailed breakdown below for subtasks, who o
 | 7 | GenAI briefing generator — turn ranked results into banker-readable client briefings | ⬜ Not started |
 | 8 | Streamlit dashboard — portfolio view, client drill-down, opportunity heatmap, briefing panel | ⬜ Not started |
 | 9 | Deployment & submission packaging — public dashboard link, 1-page PDF summary, presentation deck | ⬜ Not started |
+| 10 (stretch) | Engagement timing signals — flag clients with upcoming debt maturities or trade finance expiries as near-term opportunities | ⬜ Not started |
 
 ### Ownership model
 
@@ -218,16 +209,24 @@ is valuable even without touching the code.
 Subtasks:
 - [ ] Apply cluster benchmark ratios to each client's own financials
 - [ ] Produce total estimated wallet per client, per pillar, as a low/base/high range
+- [ ] Compute a **confidence score** per client/pillar estimate: a 0–1 average of
+      (a) a normalized score for how many comparable companies backed that cluster's
+      benchmark ratio, and (b) a normalized score for how tight the low–high range is
+      relative to the base estimate. More comparables + a tighter range = higher
+      confidence. This feeds the priority ranking in Phase 6.
 
 **🔲 Checkpoint 5 — Wallet estimation**
 - For 3–5 clients, manually recompute the wallet estimate by hand from the ratios and
   the client's financials — confirm it matches the code's output exactly
 - Confirm no client has an implausible wallet size (e.g. wallet smaller than what
   Syn Bank alone already captures, which would be a contradiction)
+- Confirm confidence scores fall between 0–1 and that a cluster with only 2
+  comparables and a wide range scores visibly lower than one with 4+ comparables and
+  a tight range — spot-check by hand on two contrasting clusters
 
 ---
 
-### Phase 6 — Share-of-wallet & gap calculation
+### Phase 6 — Share-of-wallet, gap & priority ranking
 
 **Owner:** You (code)
 **Teammate task:** Once the ranked opportunity list exists, review the top 10 and
@@ -237,13 +236,22 @@ bottom 10 clients and write a one-paragraph plain-English note on whether the ra
 Subtasks:
 - [ ] Compare estimated wallet (Phase 5) vs Syn Bank's captured activity (Phase 2)
 - [ ] Calculate share % and R-value gap per client, per pillar
-- [ ] Rank all clients/pillars by gap size
+- [ ] Compute **priority score = gap × confidence** (confidence from Phase 5) per
+      client/pillar — this reframes ranking from "biggest raw gap" to "biggest gap we
+      can actually be confident about," which is closer to how a banker would
+      realistically triage a pipeline
+- [ ] Rank all clients/pillars by priority score (keep raw gap-only ranking
+      available too, for comparison in the writeup)
 
-**🔲 Checkpoint 6 — Share-of-wallet & gap**
+**🔲 Checkpoint 6 — Share-of-wallet, gap & priority**
 - Confirm share % is between 0–100% for every client/pillar (a value outside that
   range means an upstream calculation error)
 - Confirm the ranked opportunity list is sorted correctly and R-values sum sensibly
   back to the totals from Phase 5
+- Compare the priority-score ranking against the raw-gap ranking — confirm at least
+  a few clients meaningfully swap positions (if the rankings are identical, the
+  confidence score isn't actually influencing anything, which means Phase 5's
+  scoring needs revisiting)
 
 ---
 
@@ -320,6 +328,37 @@ Subtasks:
 - Double-check `git log` and `git status` one final time for any accidentally
   committed data files before submitting
 
+---
+
+### Phase 10 (stretch) — Engagement timing signals
+
+**Owner:** You (code), teammate reviews output
+**Note:** This is explicitly optional. The brief calls out timing/engagement signals
+as a bonus area most teams won't attempt — do this only after Phases 1–9 are solid
+and submission-ready. Cut without hesitation if the deadline is close.
+
+This does **not** involve scanning real news or SENS filings — the 50 clients are
+fictional, so there's nothing real to scan. It's a rules-based flag built entirely
+from data already ingested in Phase 2:
+
+Subtasks:
+- [ ] Flag any client with a debt maturity falling within the next 12 months
+      (from the financial statement debt schedule data) as a "refinancing
+      conversation" opportunity
+- [ ] Flag any client with a trade finance facility (LC/guarantee) nearing its
+      tenor/expiry date (from the trade finance dataset) as a "renewal conversation"
+      opportunity
+- [ ] Surface both flag types in the dashboard (Phase 8) and mention them in the
+      GenAI briefing (Phase 7) where relevant, e.g. "recommend engaging now — X's
+      trade finance facility expires in 6 weeks"
+
+**🔲 Checkpoint 10 — Timing signals**
+- Confirm flagged clients actually have the underlying data condition true (spot
+  check 3–5 by hand against the raw debt/trade finance data)
+- Confirm the dashboard and any briefings mentioning a timing flag state the actual
+  date/timeframe, not a vague "soon" — specificity is what makes this credible to a
+  judge
+
 ## Tech Stack
 
 - **Python** (venv + pip) for the full pipeline
@@ -360,10 +399,13 @@ This project is built with the hackathon's judging weights directly in mind:
 
 - **Business Insight & Commercial Acumen (40%)** — the entire pipeline is oriented
   around producing a ranked, R-denominated opportunity list a banker could act on,
-  not just a model output.
+  not just a model output. Ranking by priority score (gap × confidence) rather than
+  raw gap size mirrors how a banker would realistically triage a pipeline, and the
+  optional timing-signal flags (Phase 10) point to *when* to engage, not just *who*.
 - **Analytical Rigor (30%)** — clustering and benchmark ratios are grounded in real
   comparable company financials, with assumptions stated explicitly rather than
-  buried in code.
+  buried in code. Every wallet estimate carries an explicit confidence score, so the
+  output never overstates certainty it doesn't have.
 - **Gen AI Application (20%)** — the GenAI layer narrates already-computed insights
   into a usable briefing, rather than serving as a cosmetic add-on.
 - **Presentation & Storytelling (10%)** — the Streamlit dashboard and this README are
@@ -377,5 +419,3 @@ Sunday, 16 August 2026, 23:59.
 
 - **[today's date]** — Project planning complete. Approach, tech stack, and 9-phase
   build plan finalised. Repository not yet created.
-- **2026-08-08** - Project scaffolding created locally: folder structure, gitignore,
-  dependency file, environment template, task archive, and README update instruction.
