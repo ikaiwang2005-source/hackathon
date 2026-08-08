@@ -89,9 +89,9 @@ Quick-reference summary — see the detailed breakdown below for subtasks, who o
 | Phase | Description | Status |
 |---|---|---|
 | 1 | Project scaffolding — repo structure, venv, `.gitignore`, environment setup | ✅ Done |
-| 2 | Data ingestion & profiling — load and aggregate Syn Bank's internal datasets | ⬜ Not started |
-| 3 | Client clustering — group the 50 clients by sector and size | ⬜ Not started |
-| 4 | Benchmark sourcing — pull real JSE-listed comparable financials, derive sector ratios | ⬜ Not started |
+| 2 | Data ingestion & profiling — load and aggregate Syn Bank's internal datasets | 🟨 In progress |
+| 3 | Client sector grouping & research tiering — group by known sector, split clients into Tier 1/Tier 2 by activity | ⬜ Not started |
+| 4 | Real financial data sourcing — LLM-extracted financials for Tier 1, lightweight revenue lookup for Tier 2 | ⬜ Not started |
 | 5 | Wallet estimation — apply sector ratios to estimate each client's total banking wallet | ⬜ Not started |
 | 6 | Share-of-wallet & gap calculation — compare estimated wallet to Syn Bank's captured activity, rank opportunities | ⬜ Not started |
 | 7 | GenAI briefing generator — turn ranked results into banker-readable client briefings | ⬜ Not started |
@@ -133,9 +133,9 @@ opening the CSVs in Excel/Google Sheets and documenting what's there. This dicti
 directly feeds the ingestion code and saves back-and-forth later.
 
 Subtasks:
-- [ ] Load all three internal datasets, validate schema against the brief
-- [ ] Handle missing/malformed rows
-- [ ] Aggregate per-client, per-pillar "activity currently captured by Syn Bank"
+- [x] Load all three internal datasets, validate schema against the brief
+- [x] Handle missing/malformed rows
+- [x] Aggregate per-client, per-pillar "activity currently captured by Syn Bank"
 - [ ] Teammate's data dictionary reviewed and merged into `docs/`
 
 **🔲 Checkpoint 2 — Data ingestion**
@@ -148,54 +148,77 @@ Subtasks:
 
 ---
 
-### Phase 3 — Client clustering
+### Phase 3 — Client sector grouping & research tiering
 
-**Owner:** You (clustering code)
-**Teammate task:** Compile a clean **client reference table** — client ID, name,
-sector, and any size indicator (revenue bracket, employee count, etc.) available from
-the provided data — into a single tidy sheet. This is manual organisation work, not
-coding, and is a direct input to the clustering step.
+**Owner:** You (code)
+**Teammate task:** None required for this phase — light enough to do solo now that
+sector is a known field rather than something to infer.
+
+> **Design note:** the 50 clients turned out to be real, named companies (e.g.
+> Pepkor, MTN, NEPI) with `sector` already provided as a column in the raw data.
+> This replaces the originally-planned clustering algorithm — no need to infer
+> sector/size groupings statistically when sector is already known directly.
 
 Subtasks:
-- [ ] Teammate's client reference table finalised
-- [ ] Cluster the 50 clients by sector + size
-- [ ] Sanity-check cluster sizes (avoid clusters of 1, which can't produce a
-      meaningful benchmark ratio)
+- [ ] Group the 50 clients by their existing `sector` field, sanity-check group
+      sizes (flag any sector with only 1 client — can't be benchmarked against peers)
+- [ ] Using Phase 2's per-client captured-activity totals, rank all 50 clients and
+      split into **Tier 1** (~top 15–20 by captured activity — get full individually-
+      sourced financials in Phase 4) and **Tier 2** (remaining ~30 — get a lighter
+      research treatment)
 
-**🔲 Checkpoint 3 — Clustering**
-- Print cluster assignments for all 50 clients — manually eyeball a handful per
-  cluster to confirm they make intuitive sense (e.g. mining companies aren't
-  clustered with retail companies)
-- Confirm every cluster has at least 3 members (single-member clusters can't be
-  reliably benchmarked)
+**🔲 Checkpoint 3 — Sector grouping & tiering**
+- Confirm every client has exactly one sector assigned and every sector group has
+  at least 2 members
+- Confirm the Tier 1 / Tier 2 split list looks right — the highest-activity clients
+  in Phase 2's output should be the ones in Tier 1
 
 ---
 
-### Phase 4 — Benchmark sourcing
+### Phase 4 — Real financial data sourcing (tiered, LLM-assisted)
 
-**Owner:** Teammate (primary — this phase is research-heavy and code-light, a good
-fit given the workload split)
-**Your task:** Build the loader/ratio-calculation code that turns whatever the
-teammate collects into usable per-cluster benchmark ratios.
+**Owner:** Split — see tier breakdown below. This phase pivoted from the original
+"comparable company" approach: since clients are real companies, we source each
+one's *own* real public financials rather than a proxy peer's.
 
-Teammate subtasks:
-- [ ] For each cluster, identify 2–3 real JSE-listed companies of similar sector/size
-      (annual reports, JSE SENS, company IR pages — sources suggested in the brief)
-- [ ] Pull key financials for each: revenue, COGS, foreign revenue %, debt levels
-- [ ] Record everything in a shared spreadsheet with sources cited (needed for the
-      methodology writeup and to satisfy the brief's citation requirement)
+> **Important framing for the writeup and all deliverables:** these are real
+> companies, but the banking activity data attached to them in this project is
+> entirely synthetic. Every deliverable (dashboard, PDF, PPTX) must carry a clear
+> disclaimer that the banking figures shown do not represent any actual relationship
+> these real companies have with any bank — see the Data Confidentiality section.
 
-Your subtasks:
-- [ ] Derive sector-typical ratios from the teammate's data (fee intensity, trade
-      finance intensity, FX hedging ratio, lending ratio) — ideally as a range
-      (low/base/high), not a single point value
+**Tier 1 (~15–20 clients) — full LLM extraction:**
+- **Teammate task:** For each Tier 1 client, find their most recent annual report or
+  investor-relations financial summary (JSE SENS, company IR page) and save the
+  source (PDF or page text) into `data/research/tier1/`.
+- **Your task:** Build an LLM extraction step (Gemini) that takes each saved
+  report/page and extracts structured fields: revenue, COGS, foreign revenue %, and
+  debt schedule (upcoming maturities — this also feeds Phase 10's timing signals).
+  Always keep the source citation alongside the extracted numbers.
 
-**🔲 Checkpoint 4 — Benchmarks**
-- Confirm every cluster has at least 2 comparable companies with sourced financials
-- Spot-check 2–3 derived ratios against publicly known industry norms (e.g. does the
-  trade finance intensity for mining look reasonable compared to what's publicly
-  reported about SA mining sector banking activity?) — flag anything that looks wildly
-  off before it propagates downstream
+**Tier 2 (~30 clients) — lightweight, revenue-only:**
+- **Teammate task:** For each Tier 2 client, find just their most recent reported
+  revenue figure from a quick public source (market summary/profile page) — no full
+  report needed. Record in a simple spreadsheet with source.
+- **Your task:** Apply Tier 1's derived sector ratios (see Phase 5) to each Tier 2
+  client's real revenue to estimate their other financial inputs.
+
+Subtasks:
+- [ ] Tier 1 sources collected (teammate)
+- [ ] LLM extraction pipeline built and run on Tier 1 (you)
+- [ ] Tier 2 revenue figures collected (teammate)
+- [ ] Sector-typical ratios derived from Tier 1 data, ready to apply to Tier 2 (you)
+
+**🔲 Checkpoint 4 — Financial data sourcing**
+- Confirm every Tier 1 client has extracted revenue, COGS, foreign revenue %, and
+  debt data, each traceable to a cited source
+- Spot-check 3–5 LLM-extracted values against the source document by hand — this is
+  the step most likely to silently produce wrong numbers if the extraction prompt
+  is loose, so don't skip this
+- Confirm every Tier 2 client has at least a real, sourced revenue figure
+- Confirm every sector group has enough Tier 1 members to derive a meaningful ratio
+  (at least 2) — if a sector is Tier-2-only, flag it, since there's no ratio to
+  extrapolate from and that sector's estimates will be weaker
 
 ---
 
@@ -393,6 +416,16 @@ All Syn Bank datasets are synthetic, fictional, and provided solely for this
 hackathon, but are treated as confidential throughout this project. Raw data files
 are never committed to this repository — see `.gitignore`.
 
+**Real company names, fictional banking data.** The 50 clients in this dataset are
+named after real, publicly-listed companies (e.g. Pepkor, MTN, NEPI). Their sector
+and publicly-available financial figures (revenue, debt, etc., sourced in Phase 4)
+are real. **All banking transaction, SWIFT, and trade finance activity attributed to
+them in this project is entirely synthetic** and does not represent any actual
+banking relationship these companies have with any real bank. Every deliverable
+(dashboard, PDF summary, presentation) must display this disclaimer clearly — this
+is not optional, since presenting fictional banking figures against real company
+names without a clear disclaimer risks being misread as real information.
+
 ## Evaluation Alignment
 
 This project is built with the hackathon's judging weights directly in mind:
@@ -419,3 +452,6 @@ Sunday, 16 August 2026, 23:59.
 
 - **[today's date]** — Project planning complete. Approach, tech stack, and 9-phase
   build plan finalised. Repository not yet created.
+- **2026-08-08** - Built Task 002 ingestion/profiling: raw CSVs convert to local
+  Parquet caches, profiling flags 20 unique clients plus duplicate IDs for review,
+  and `outputs/client_activity_ranking.csv` is generated for Phase 3 tiering.

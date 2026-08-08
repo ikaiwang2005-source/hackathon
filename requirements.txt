@@ -4,5 +4,7 @@ scikit-learn
 streamlit
 plotly
 google-generativeai
+openpyxl
+pyarrow
 python-dotenv
 pytest

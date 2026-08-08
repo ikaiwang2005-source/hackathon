@@ -10,6 +10,10 @@ __pycache__/
 # Confidential data - never commit real data files
 data/*
 !data/.gitkeep
+data/processed/
+
+# Derived confidential outputs
+outputs/client_activity_ranking.csv
 
 # OS/editor cruft
 .DS_Store
